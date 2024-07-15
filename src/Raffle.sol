@@ -13,7 +13,7 @@ import {VRFV2PlusClient} from "@chainlink/contracts/v0.8/vrf/dev/libraries/VRFV2
 contract Raffle is VRFConsumerBaseV2Plus {
     //Errors
     error Raffle__InefficientFunds();
-    error Raffle__UpkeepNotNeeded(uint256 isRaffleOpen, uint256 isIntervalCompleted, uint256 hasPlayers, uint256 hasEth);
+    error Raffle__UpkeepNotNeeded(RaffleState isRaffleOpen, uint256 hasPlayers, uint256 hasEth);
     error Raffle__moneyTransferFailed();
     error Raffle__cannotEnterWhileCalculatingWinner();
     error Raffle__tranferExcessFundsCancelled(uint256 excessAmount);
@@ -40,6 +40,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     //Events
     event raffleEntered(address indexed player);
     event winnerPicked(address indexed winner, uint256 timeStamp);
+    event requestedRaffleWinner(uint256 indexed requestId);
 
     constructor(
         uint256 _ticketPrice,
@@ -114,14 +115,12 @@ contract Raffle is VRFConsumerBaseV2Plus {
     function performUpkeep(bytes calldata /* performData */ ) external {
         (bool upkeepNeeded,) = checkUpkeep("");
         if (!upkeepNeeded) {
-            revert Raffle__UpkeepNotNeeded(
-                uint256(s_raffleState), s_lastTimeStamp, s_players.length, address(this).balance
-            );
+            revert Raffle__UpkeepNotNeeded(s_raffleState, s_players.length, address(this).balance);
         }
 
         s_raffleState = RaffleState.CLOSED;
 
-        s_vrfCoordinator.requestRandomWords(
+        uint256 requestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
                 keyHash: i_keyHash,
                 subId: i_subscriptionId,
@@ -131,10 +130,11 @@ contract Raffle is VRFConsumerBaseV2Plus {
                 extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
             })
         );
+        emit requestedRaffleWinner(requestId);
     }
 
     //Below function selects the winner and sends the money to the winner
-    function fulfillRandomWords(uint256, /*requestId*/ uint256[] calldata randomWords) internal override {
+    function fulfillRandomWords(uint256 /*requestId*/, uint256[] calldata randomWords) internal override {
         uint256 winnerIndex = randomWords[0] % s_players.length;
         address payable winnerAddress = s_players[winnerIndex];
         s_recentWinner = winnerAddress;
@@ -164,5 +164,21 @@ contract Raffle is VRFConsumerBaseV2Plus {
 
     function getSubscriptionId() external view returns (uint256) {
         return i_subscriptionId;
+    }
+
+    function getKeyHash() external view returns (bytes32) {
+        return i_keyHash;
+    }
+
+    function getCallbackGasLimit() external view returns (uint256) {
+        return i_callbackGasLimit;
+    }
+
+    function getRecentWinner() external view returns (address) {
+        return s_recentWinner;
+    }
+
+    function getTimeStamp() external view returns (uint256) {
+        return s_lastTimeStamp;
     }
 }
