@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 import {LinkToken} from "../test/mocks/LinkToken.sol";
 
@@ -30,6 +30,7 @@ contract HelperConfig is Script, CodeConstants {
         uint256 subscriptionId;
         uint32 callbackGasLimit;
         address link;
+        address account;
     }
 
     mapping(uint256 => NetworkConfig) public networkConfig;
@@ -45,6 +46,7 @@ contract HelperConfig is Script, CodeConstants {
      * Unlike the fundMe contract here we are using a function instead of the constructor and calling that function in the Ruffle contract. In the fundMe we are simply assigining the struct with the values and then calling it in the other contract but i this sincerio we will be calling the function for getting the network config based on the chain id.
      */
     function getConfigByChainid() public returns (NetworkConfig memory) {
+        console.log("From within the getConfig", networkConfig[block.chainid].vrfCoordinator);
         if (networkConfig[block.chainid].vrfCoordinator != address(0)) {
             return networkConfig[block.chainid];
         } else if (block.chainid == LOCAL_CHAIN_ID) {
@@ -62,7 +64,8 @@ contract HelperConfig is Script, CodeConstants {
             gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
             subscriptionId: 109064213244911707800218494862008793638653672925758480575172833685521395175627, // don't why it's zero
             callbackGasLimit: 500000, // 500,000 => don't know why this is the gas limit!
-            link: 0x779877A7B0D9E8603169DdbD7836e478b4624789
+            link: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
+            account: 0xBC428Bb80B1cc3C29164820528819Abf6b20cB88
         });
     }
 
@@ -77,6 +80,9 @@ contract HelperConfig is Script, CodeConstants {
         LinkToken linkToken = new LinkToken();
         vm.stopBroadcast();
 
+        console.log("from helper config", address(vrfCoordinator));
+        console.log("also from helper config but from the localNetwokConfig", localNetworkConfig.vrfCoordinator);
+
         localNetworkConfig = NetworkConfig({
             ticketPrice: 0.01 ether, //1e16
             interval: 30 seconds,
@@ -84,7 +90,8 @@ contract HelperConfig is Script, CodeConstants {
             gasLane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
             subscriptionId: 0, // ight have to change it up a lill bit.
             callbackGasLimit: 500000, // ? 500,000 => don't know why this is the gas limit!
-            link: address(linkToken)
+            link: address(linkToken),
+            account: 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
         });
 
         return localNetworkConfig;
